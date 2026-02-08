@@ -1,0 +1,57 @@
+{
+    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+    "name": "io.github.rclone-ui/rclone",
+    "description": "MCP server for the Rclone RC API. Auto-generates tools from the OpenAPI spec with selectable toolsets.",
+    "repository": {
+        "url": "https://github.com/rclone-ui/rclone-mcp",
+        "source": "github"
+    },
+    "version": "1.0.0",
+    "packages": [
+        {
+            "registryType": "npm",
+            "identifier": "rclone-mcp",
+            "version": "1.0.0",
+            "transport": {
+                "type": "stdio"
+            },
+            "environmentVariables": [
+                {
+                    "name": "RCLONE_URL",
+                    "description": "Rclone RC daemon URL",
+                    "isRequired": false,
+                    "format": "string",
+                    "isSecret": false
+                },
+                {
+                    "name": "RCLONE_USER",
+                    "description": "HTTP Basic Auth username",
+                    "isRequired": false,
+                    "format": "string",
+                    "isSecret": false
+                },
+                {
+                    "name": "RCLONE_PASS",
+                    "description": "HTTP Basic Auth password",
+                    "isRequired": false,
+                    "format": "string",
+                    "isSecret": true
+                },
+                {
+                    "name": "RCLONE_TOOLSETS",
+                    "description": "Comma-separated list of toolsets to enable (default, all, or specific: core, config, operations, sync, jobs, vfs, mount, etc.)",
+                    "isRequired": false,
+                    "format": "string",
+                    "isSecret": false
+                },
+                {
+                    "name": "RCLONE_READ_ONLY",
+                    "description": "Set to 1 to disable write tools",
+                    "isRequired": false,
+                    "format": "string",
+                    "isSecret": false
+                }
+            ]
+        }
+    ]
+}
