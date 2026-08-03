@@ -1,18 +1,60 @@
-export const TOOLSET_DEFINITIONS: Record<string, { paths: string[]; default: boolean }> = {
-    core: { paths: ['/core/', '/rc/'], default: true },
-    config: { paths: ['/config/'], default: true },
-    operations: { paths: ['/operations/'], default: true },
-    sync: { paths: ['/sync/'], default: true },
-    jobs: { paths: ['/job/'], default: false },
-    vfs: { paths: ['/vfs/'], default: false },
-    mount: { paths: ['/mount/'], default: false },
-    serve: { paths: ['/serve/'], default: false },
-    cache: { paths: ['/cache/'], default: false },
-    debug: { paths: ['/debug/'], default: false },
-    backend: { paths: ['/backend/'], default: false },
-    options: { paths: ['/options/'], default: false },
-    plugins: { paths: ['/pluginsctl/'], default: false },
-    fscache: { paths: ['/fscache/'], default: false },
+export const TOOLSET_DEFINITIONS: Record<string, { default: boolean }> = {
+    core: { default: true },
+    config_read: { default: true },
+    operations: { default: true },
+    sharing: { default: false },
+    sync: { default: false },
+    jobs: { default: false },
+    config_admin: { default: false },
+    operations_advanced: { default: false },
+    mount: { default: false },
+    serve: { default: false },
+    core_advanced: { default: false },
+    vfs: { default: false },
+    cache: { default: false },
+    debug: { default: false },
+    backend: { default: false },
+    options: { default: false },
+    plugins: { default: false },
+    fscache: { default: false },
+}
+
+const EXACT_PATH_TOOLSETS: Record<string, string> = {
+    '/operations/list': 'operations',
+    '/operations/stat': 'operations',
+    '/operations/size': 'operations',
+    '/operations/copyfile': 'operations',
+    '/operations/movefile': 'operations',
+    '/operations/mkdir': 'operations',
+    '/operations/deletefile': 'operations',
+    '/config/listremotes': 'config_read',
+    '/config/get': 'config_read',
+    '/core/version': 'core',
+    '/core/stats': 'core',
+    '/operations/about': 'core',
+    '/operations/publiclink': 'sharing',
+    '/config/create': 'config_admin',
+    '/config/update': 'config_admin',
+    '/config/delete': 'config_admin',
+    '/config/password': 'config_admin',
+}
+
+const PREFIX_TOOLSETS: Record<string, string> = {
+    '/operations/': 'operations_advanced',
+    '/config/': 'config_admin',
+    '/core/': 'core_advanced',
+    '/rc/': 'core_advanced',
+    '/sync/': 'sync',
+    '/job/': 'jobs',
+    '/vfs/': 'vfs',
+    '/mount/': 'mount',
+    '/serve/': 'serve',
+    '/cache/': 'cache',
+    '/debug/': 'debug',
+    '/backend/': 'backend',
+    '/options/': 'options',
+    '/pluginsctl/': 'plugins',
+    '/fscache/': 'fscache',
 }
 
 const READ_ONLY_OPERATIONS = new Set([
@@ -80,9 +122,12 @@ export function isReadOnly(operationId: string): boolean {
 }
 
 export function getToolsetForPath(apiPath: string): string | undefined {
-    for (const [name, def] of Object.entries(TOOLSET_DEFINITIONS)) {
-        if (def.paths.some((prefix) => apiPath.startsWith(prefix))) {
-            return name
+    if (apiPath in EXACT_PATH_TOOLSETS) {
+        return EXACT_PATH_TOOLSETS[apiPath]
+    }
+    for (const [prefix, toolset] of Object.entries(PREFIX_TOOLSETS)) {
+        if (apiPath.startsWith(prefix)) {
+            return toolset
         }
     }
     return undefined

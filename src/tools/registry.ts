@@ -79,28 +79,56 @@ function openApiTypeToZod(schema: OpenApiParam['schema']): z.ZodTypeAny {
     }
 }
 
+const LONG_RUNNING_TOOLS = new Set([
+    'sync_sync',
+    'sync_bisync',
+    'sync_copy',
+    'sync_move',
+    'sync_resync',
+    'operations_size',
+    'operations_copyfile',
+    'operations_movefile',
+    'operations_copyurl',
+    'operations_check',
+    'operations_purge',
+    'operations_delete',
+])
+
 function buildInputSchema(
     spec: OpenApiSpec,
-    parameters: (OpenApiParam | { $ref: string })[]
+    parameters: (OpenApiParam | { $ref: string })[] | undefined,
+    toolName: string
 ): Record<string, z.ZodTypeAny> | undefined {
     const shape: Record<string, z.ZodTypeAny> = {}
     let hasParams = false
 
-    for (const rawParam of parameters) {
-        const param = resolveParam(spec, rawParam)
-        if (!param || param.in !== 'query') continue
+    if (parameters) {
+        for (const rawParam of parameters) {
+            const param = resolveParam(spec, rawParam)
+            if (!param || param.in !== 'query') continue
 
-        let zodType = openApiTypeToZod(param.schema)
+            let zodType = openApiTypeToZod(param.schema)
 
-        if (param.description) {
-            zodType = zodType.describe(param.description)
+            if (param.description) {
+                zodType = zodType.describe(param.description)
+            }
+
+            if (!param.required) {
+                zodType = zodType.optional()
+            }
+
+            shape[param.name] = zodType
+            hasParams = true
         }
+    }
 
-        if (!param.required) {
-            zodType = zodType.optional()
-        }
-
-        shape[param.name] = zodType
+    if (LONG_RUNNING_TOOLS.has(toolName)) {
+        shape._async = z
+            .boolean()
+            .optional()
+            .describe(
+                'Run this operation asynchronously in the background. Highly recommended to set to true for long-running operations to avoid timeout.'
+            )
         hasParams = true
     }
 
@@ -125,11 +153,20 @@ export function registerTools(
 
         if (readOnly && !isReadOnly(operation.operationId)) continue
 
-        const toolName = camelToSnake(operation.operationId)
-        const description = [operation.summary, operation.description].filter(Boolean).join(' — ')
-        const inputSchema = operation.parameters
-            ? buildInputSchema(spec, operation.parameters)
-            : undefined
+        let toolName = camelToSnake(operation.operationId)
+        if (apiPath === '/operations/list') {
+            toolName = 'rclone_lsjson'
+        } else if (apiPath === '/operations/about') {
+            toolName = 'core_about'
+        }
+
+        let description = [operation.summary, operation.description].filter(Boolean).join(' — ')
+        if (LONG_RUNNING_TOOLS.has(toolName)) {
+            description +=
+                '\n\nIMPORTANT: If this operation is expected to take a long time (more than a few seconds), you MUST set `_async: true` to run it in the background. It will return a `jobid` immediately, which you can poll using the `job_status` tool.'
+        }
+
+        const inputSchema = buildInputSchema(spec, operation.parameters, toolName)
 
         const cb = async (args: Record<string, unknown>) => {
             try {
