@@ -1,18 +1,25 @@
 {
-    "name": "rclone-mcp",
+    "name": "rclone-mcp-server",
     "version": "1.0.0",
     "mcpName": "io.github.rclone-ui/rclone",
-    "keywords": ["rclone", "mcp", "mcp-server", "model-context-protocol", "rclone-remote-control"],
+    "keywords": [
+        "rclone",
+        "mcp",
+        "mcp-server",
+        "model-context-protocol",
+        "rclone-remote-control"
+    ],
     "author": "https://github.com/rclone-ui",
     "license": "MIT",
     "description": "MCP server for the Rclone RC API. Auto-generates tools from the OpenAPI spec with selectable toolsets.",
     "repository": {
         "type": "git",
-        "url": "https://github.com/rclone-ui/rclone-mcp.git"
+        "url": "git+https://github.com/angenge/rclone-mcp-server.git"
     },
+    "homepage": "https://github.com/angenge/rclone-mcp-server",
     "type": "module",
     "bin": {
-        "rclone-mcp": "./dist/index.js"
+        "rclone-mcp-server": "dist/index.js"
     },
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
@@ -22,7 +29,9 @@
             "import": "./dist/index.js"
         }
     },
-    "files": ["dist"],
+    "files": [
+        "dist"
+    ],
     "scripts": {
         "build": "tsup",
         "dev": "tsx src/index.ts",

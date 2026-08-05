@@ -1,4 +1,4 @@
-# rclone-mcp
+# rclone-mcp-server
 
 [![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?&logo=discord&logoColor=white)](https://discord.gg/rclone)
 
@@ -27,7 +27,7 @@ Add to your `.cursor/mcp.json` or `claude_desktop_config.json`:
   "mcpServers": {
     "rclone": {
       "command": "npx",
-      "args": ["-y", "rclone-mcp"],
+      "args": ["-y", "rclone-mcp-server"],
       "env": {
         "RCLONE_URL": "http://localhost:5572"
       }
@@ -43,7 +43,7 @@ Add to your `.cursor/mcp.json` or `claude_desktop_config.json`:
   "mcpServers": {
     "rclone": {
       "command": "npx",
-      "args": ["-y", "rclone-mcp"],
+      "args": ["-y", "rclone-mcp-server"],
       "env": {
         "RCLONE_URL": "http://localhost:5572",
         "RCLONE_USER": "admin",
@@ -57,11 +57,11 @@ Add to your `.cursor/mcp.json` or `claude_desktop_config.json`:
 ### Docker
 
 ```bash
-docker build -t rclone-mcp .
+docker build -t rclone-mcp-server .
 
 docker run -i --rm \
   -e RCLONE_URL=http://host.docker.internal:5572 \
-  rclone-mcp
+  rclone-mcp-server
 ```
 
 ### Streamable HTTP transport
@@ -69,7 +69,7 @@ docker run -i --rm \
 For remote hosting or web-based MCP clients:
 
 ```bash
-npx rclone-mcp http --port 3000
+npx rclone-mcp-server http --port 3000
 ```
 
 ## Configuration
@@ -87,11 +87,11 @@ npx rclone-mcp http --port 3000
 ### CLI Arguments
 
 ```
-rclone-mcp [command]
+rclone-mcp-server [command]
 
 Commands:
-  rclone-mcp stdio  Run with stdio transport (default)
-  rclone-mcp http   Run with Streamable HTTP transport
+  rclone-mcp-server stdio  Run with stdio transport (default)
+  rclone-mcp-server http   Run with Streamable HTTP transport
 
 Options:
   --toolsets   Comma-separated list of toolsets
@@ -105,14 +105,18 @@ Tools are grouped by API path prefix. Enable only what you need to keep the tool
 
 | Toolset | Paths | Default |
 |---|---|---|
-| `core` | `/core/*`, `/rc/*` | Yes |
-| `config` | `/config/*` | Yes |
-| `operations` | `/operations/*` | Yes |
-| `sync` | `/sync/*` | Yes |
+| `core` | `/core/version`, `/core/stats`, `/operations/about` | Yes |
+| `config_read` | `/config/listremotes`, `/config/get` | Yes |
+| `operations` | `/operations/list`, `/operations/stat`, `/operations/size`, `/operations/copyfile`, `/operations/movefile`, `/operations/mkdir`, `/operations/deletefile` | Yes |
+| `sharing` | `/operations/publiclink` | No |
+| `sync` | `/sync/*` | No |
 | `jobs` | `/job/*` | No |
-| `vfs` | `/vfs/*` | No |
+| `config_admin` | `/config/*` (rest) | No |
+| `operations_advanced` | `/operations/*` (rest) | No |
 | `mount` | `/mount/*` | No |
 | `serve` | `/serve/*` | No |
+| `core_advanced` | `/core/*`, `/rc/*` (rest) | No |
+| `vfs` | `/vfs/*` | No |
 | `cache` | `/cache/*` | No |
 | `debug` | `/debug/*` | No |
 | `backend` | `/backend/*` | No |
@@ -121,26 +125,26 @@ Tools are grouped by API path prefix. Enable only what you need to keep the tool
 | `fscache` | `/fscache/*` | No |
 
 Special values:
-- `default` — the four default toolsets (core, config, operations, sync)
+- `default` — the three default toolsets (core, config_read, operations)
 - `all` — every toolset
 
 ### Examples
 
 ```bash
-# Default toolsets (55 tools)
-npx rclone-mcp
+# Default toolsets (12 tools)
+npx rclone-mcp-server
 
 # Everything (98 tools)
-RCLONE_TOOLSETS=all npx rclone-mcp
+RCLONE_TOOLSETS=all npx rclone-mcp-server
 
 # Just file operations and config
-npx rclone-mcp --toolsets operations,config
+npx rclone-mcp-server --toolsets operations,config_read
 
 # Default + mount
-npx rclone-mcp --toolsets default,mount
+npx rclone-mcp-server --toolsets default,mount
 
 # Read-only mode (no copy, delete, sync, etc.)
-npx rclone-mcp --read-only
+npx rclone-mcp-server --read-only
 ```
 
 ## Read-Only Mode

@@ -123,7 +123,7 @@ async function runHttp(port: number, toolsets: string | undefined, readOnly: boo
     })
 
     httpServer.listen(port, () => {
-        console.error(`rclone-mcp Streamable HTTP server listening on port ${port}`)
+        console.error(`rclone-mcp-server Streamable HTTP server listening on port ${port}`)
     })
 
     process.on('SIGINT', async () => {
@@ -167,7 +167,7 @@ function isInitializeRequest(body: unknown): boolean {
 }
 
 yargs(hideBin(process.argv))
-    .scriptName('rclone-mcp')
+    .scriptName('rclone-mcp-server')
     .command(
         ['stdio', '$0'],
         'Run with stdio transport (default)',
