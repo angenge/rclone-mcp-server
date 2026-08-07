@@ -2,6 +2,7 @@ import { createRequire } from 'node:module'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { RCDClient } from 'rclone-sdk'
 import { z } from 'zod'
+import { sanitizeConfig } from '../sanitize.js'
 import { camelToSnake, getToolsetForPath, isReadOnly } from './toolsets.js'
 
 // Use createRequire to load the bundled JSON spec from rclone-openapi
@@ -186,7 +187,9 @@ export function registerTools(
                     }
                 ).POST(apiPath, {
                     params:
-                        Object.keys(queryParams).length > 0 ? { query: queryParams } : undefined,
+                        Object.keys(queryParams).length > 0
+                            ? { query: serializeQueryParams(queryParams) }
+                            : undefined,
                 })
 
                 if (response.error) {
@@ -200,9 +203,14 @@ export function registerTools(
                     }
                 }
 
+                let data = response.data
+                if (toolName === 'config_get' && data !== undefined) {
+                    data = sanitizeConfig(data)
+                }
+
                 const text =
-                    response.data !== undefined
-                        ? JSON.stringify(response.data, null, 2)
+                    data !== undefined
+                        ? JSON.stringify(data, null, 2)
                         : `OK (${response.response.status})`
 
                 return {
@@ -227,4 +235,16 @@ export function registerTools(
     }
 
     return count
+}
+
+function serializeQueryParams(params: Record<string, unknown>): Record<string, unknown> {
+    const result: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(params)) {
+        if (Array.isArray(value) || (value !== null && typeof value === 'object')) {
+            result[key] = JSON.stringify(value)
+        } else {
+            result[key] = value
+        }
+    }
+    return result
 }
