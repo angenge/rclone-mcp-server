@@ -1,7 +1,5 @@
 # rclone-mcp-server
 
-[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?&logo=discord&logoColor=white)](https://discord.gg/rclone)
-
 MCP (Model Context Protocol) server for the [Rclone](https://rclone.org/) RC API. Gives AI assistants the ability to manage cloud storage remotes, copy/sync files, list directories, and more — all through natural language.
 
 Tools are auto-generated from the [rclone-openapi](https://github.com/rclone-ui/rclone-openapi) spec using the [rclone-sdk](https://github.com/rclone-ui/rclone-sdk) client. 98 endpoints, organized into selectable toolsets.
@@ -156,12 +154,10 @@ When `--read-only` or `RCLONE_READ_ONLY=1` is set, only non-mutating tools are r
 MIT
 
 <div align="center">
-<a href="https://discord.gg/rclone">
-<img src="https://img.shields.io/badge/Discord-%235865F2.svg?&logo=discord&logoColor=white&style=for-the-badge">
-</a>
-</div>
-
-<div align="center">
 <sub>Made with ☁️ for the rclone community</sub>
 </div>
+
+---
+
+This project is a secondary refactor based on [rclone-ui/rclone-mcp](https://github.com/rclone-ui/rclone-mcp).
 
