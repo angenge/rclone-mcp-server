@@ -3,7 +3,8 @@ import { createClient } from './client.js'
 import { registerTools } from './tools/registry.js'
 import { resolveToolsets } from './tools/toolsets.js'
 
-const PKG_VERSION = '0.1.0'
+import pkg from '../package.json' with { type: 'json' }
+const PKG_VERSION = pkg.version
 
 async function callRCD(client: any, url: string, params?: Record<string, any>) {
     const apiPath = url.startsWith('/') ? url : `/${url}`
@@ -59,7 +60,7 @@ export function createMcpServer(options: {
     readOnly?: boolean
 }): McpServer {
     const server = new McpServer({
-        name: 'rclone-mcp',
+        name: 'rclone-mcp-server',
         version: PKG_VERSION,
     })
 
@@ -71,7 +72,7 @@ export function createMcpServer(options: {
 
     const toolsetList = [...enabledToolsets].join(', ')
     console.error(
-        `rclone-mcp v${PKG_VERSION}: registered ${toolCount} tools [toolsets: ${toolsetList}]${readOnly ? ' (read-only)' : ''}`
+        `rclone-mcp-server v${PKG_VERSION}: registered ${toolCount} tools [toolsets: ${toolsetList}]${readOnly ? ' (read-only)' : ''}`
     )
 
     // Register Static MCP Resources
