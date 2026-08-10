@@ -52,6 +52,39 @@ Add to your `.cursor/mcp.json` or `claude_desktop_config.json`:
 }
 ```
 
+### opencode
+
+Add a `local` server under `mcp` in your global `~/.config/opencode/opencode.json`
+(or a project-level `opencode.json`):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "rclone-mcp-server": {
+      "type": "local",
+      "command": ["npx", "-y", "rclone-mcp-server"],
+      "environment": {
+        "RCLONE_URL": "https://rclone.example.com",
+        "RCLONE_USER": "your_user",
+        "RCLONE_PASS": "your_password"
+      }
+    }
+  }
+}
+```
+
+opencode's MCP config differs from other clients — do not copy the `mcpServers`
+block above verbatim:
+
+- `type: "local"` is **required**; opencode uses it to decide how to spawn the server.
+- `command` must be an **array** of strings; there is no separate `args` key.
+- Environment variables go under `environment`, not `env`.
+- Use `"enabled": false` to disable a server, and tune toolsets/read-only via
+  `RCLONE_TOOLSETS` / `RCLONE_READ_ONLY` as described in [Environment Variables](#environment-variables).
+- Restart opencode after editing — config is only loaded at startup. Its tools
+  then appear under the `mcp__rclone-mcp-server__` prefix.
+
 ### Docker
 
 ```bash
