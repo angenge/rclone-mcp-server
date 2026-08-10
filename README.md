@@ -16,9 +16,21 @@ rclone rcd --rc-user=admin --rc-pass=secret
 
 ## Installation
 
-### Cursor / Claude Desktop (stdio)
+All configurations below assume a running rclone daemon (see
+[Prerequisites](#prerequisites)). Pick one **transport** — it decides the shape of
+your client config:
 
-Add to your `.cursor/mcp.json` or `claude_desktop_config.json`:
+- **stdio** — the MCP client spawns a local server process itself (`npx`/`node`, or
+  wrapped in a Docker container) and talks to it over the process's stdin/stdout.
+  This is what Cursor, Claude Desktop, and opencode use locally.
+- **Streamable HTTP** — a standalone server runs somewhere and clients connect over
+  HTTP to its `/mcp` endpoint. No client-side process is spawned.
+
+### Stdio transport (local processes)
+
+#### Directly with npx (requires Node.js)
+
+**Cursor / Claude Desktop** (`.cursor/mcp.json` or `claude_desktop_config.json`):
 
 ```json
 {
@@ -34,28 +46,7 @@ Add to your `.cursor/mcp.json` or `claude_desktop_config.json`:
 }
 ```
 
-### With authentication
-
-```json
-{
-  "mcpServers": {
-    "rclone-mcp-server": {
-      "command": "npx",
-      "args": ["-y", "rclone-mcp-server"],
-      "env": {
-        "RCLONE_URL": "http://localhost:5572",
-        "RCLONE_USER": "admin",
-        "RCLONE_PASS": "secret"
-      }
-    }
-  }
-}
-```
-
-### opencode
-
-Add a `local` server under `mcp` in your global `~/.config/opencode/opencode.json`
-(or a project-level `opencode.json`):
+**opencode** (`~/.config/opencode/opencode.json`, or a project-level `opencode.json`):
 
 ```json
 {
@@ -65,9 +56,7 @@ Add a `local` server under `mcp` in your global `~/.config/opencode/opencode.jso
       "type": "local",
       "command": ["npx", "-y", "rclone-mcp-server"],
       "environment": {
-        "RCLONE_URL": "https://rclone.example.com",
-        "RCLONE_USER": "your_user",
-        "RCLONE_PASS": "your_password"
+        "RCLONE_URL": "https://rclone.example.com"
       }
     }
   }
@@ -80,30 +69,187 @@ block above verbatim:
 - `type: "local"` is **required**; opencode uses it to decide how to spawn the server.
 - `command` must be an **array** of strings; there is no separate `args` key.
 - Environment variables go under `environment`, not `env`.
-- Use `"enabled": false` to disable a server, and tune toolsets/read-only via
-  `RCLONE_TOOLSETS` / `RCLONE_READ_ONLY` as described in [Environment Variables](#environment-variables).
+- Use `"enabled": false` to disable a server.
 - Restart opencode after editing — config is only loaded at startup. Its tools
   then appear under the `mcp__rclone-mcp-server__` prefix.
 
-### Docker
+**With HTTP Basic Auth** (rcd behind a reverse proxy). The same shape works for any
+stdio launch — put the auth variables under `env` for Cursor/Claude Desktop as shown,
+under `environment` for opencode, or as `-e` flags for Docker:
 
-```bash
-docker build -t rclone-mcp-server .
-
-docker run -i --rm \
-  -e RCLONE_URL=http://host.docker.internal:5572 \
-  rclone-mcp-server
+```json
+{
+  "mcpServers": {
+    "rclone-mcp-server": {
+      "command": "npx",
+      "args": ["-y", "rclone-mcp-server"],
+      "env": {
+        "RCLONE_URL": "https://rclone.example.com",
+        "RCLONE_USER": "your_user",
+        "RCLONE_PASS": "your_password"
+      }
+    }
+  }
+}
 ```
 
-### Streamable HTTP transport
+#### Via Docker (container over stdio)
 
-For remote hosting or web-based MCP clients:
+Still **stdio** — the container just runs the same server
+(`ENTRYPOINT node dist/index.js`, default `stdio` command) and the client starts it
+with `docker run`. Use this when the client machine has Docker but you don't want
+Node.js/npm installed there.
+
+**Step 1 — build the image** (once, on the machine that runs Docker):
 
 ```bash
+cd rclone-mcp-server
+docker build -t rclone-mcp-server .
+```
+
+**Step 2 — configure the client to spawn `docker run -i --rm ... rclone-mcp-server`**
+instead of `npx`.
+
+opencode:
+
+```json
+{
+  "mcp": {
+    "rclone-mcp-server": {
+      "type": "local",
+      "command": [
+        "docker", "run", "-i", "--rm",
+        "-e", "RCLONE_URL=http://host.docker.internal:5572",
+        "-e", "RCLONE_USER=your_user",
+        "-e", "RCLONE_PASS=your_password",
+        "rclone-mcp-server"
+      ]
+    }
+  }
+}
+```
+
+Cursor / Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "rclone-mcp-server": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "RCLONE_URL=http://host.docker.internal:5572",
+        "-e", "RCLONE_USER=your_user",
+        "-e", "RCLONE_PASS=your_password",
+        "rclone-mcp-server"
+      ]
+    }
+  }
+}
+```
+
+Notes:
+
+- `-i` is mandatory: it pipes the client's stdin/stdout into the container, which is
+  how stdio MCP works.
+- `host.docker.internal` resolves to the machine running Docker. Use it when `rcd`
+  runs on that same machine; otherwise set `RCLONE_URL` to the real daemon address.
+  Note: Docker Desktop (Windows/macOS) adds this host automatically, but plain
+  Docker Engine on Linux does **not** — there you must also pass
+  `--add-host=host.docker.internal:host-gateway`. On Linux you can instead just set
+  `RCLONE_URL` to the host's LAN IP and skip the flag.
+- Environment variables must be passed with `-e` (or `--env-file`) — a client's own
+  `environment`/`env` block does **not** reach inside the container.
+- Tune toolsets/read-only with e.g. `-e RCLONE_TOOLSETS=default,jobs` or
+  `-e RCLONE_READ_ONLY=1` (see [Environment Variables](#environment-variables)).
+
+### Streamable HTTP transport (standalone server)
+
+The server runs on its own and clients connect over HTTP — no client-side spawn.
+Use for remote hosting or web-based MCP clients that can't spawn local processes, or
+when you want one server shared by many clients.
+
+**Step 1 — start the server** on a machine that can reach the rcd daemon. The rclone
+connection settings come from that machine's environment:
+
+```bash
+RCLONE_URL=https://rclone.example.com \
+RCLONE_USER=your_user \
+RCLONE_PASS=your_password \
 npx rclone-mcp-server http --port 3000
 ```
 
+(`KEY=value` prefixes are bash/POSIX syntax — on Windows cmd use `set "RCLONE_URL=..."`,
+on PowerShell `$env:RCLONE_URL="..."`.)
+
+It listens on `http://0.0.0.0:3000/mcp` (the `/mcp` path only).
+
+**Step 2 — point clients at the endpoint** instead of a local command.
+
+opencode (`~/.config/opencode/opencode.json`):
+
+```json
+{
+  "mcp": {
+    "rclone-mcp-server": {
+      "type": "remote",
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
+```
+
+Cursor (`.cursor/mcp.json`, UI: Type = streamableHttp):
+
+```json
+{
+  "mcpServers": {
+    "rclone-mcp-server": {
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
+```
+
+Claude Desktop (`claude_desktop_config.json`) does not accept `url` entries (they are
+silently dropped), so bridge over stdio with `mcp-remote`:
+
+```json
+{
+  "mcpServers": {
+    "rclone-mcp-server": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://localhost:3000/mcp"]
+    }
+  }
+}
+```
+
+Note: replace `localhost` with the server's hostname/IP when clients run on other
+machines. The server binds all interfaces by default — put it behind a reverse proxy
+with authentication (HTTPS) before exposing it publicly, and point clients at
+`https://your-host.example.com/mcp`.
+
+Also note that `RCLONE_USER`/`RCLONE_PASS` only protect the link between *this server
+and rcd* — the MCP `/mcp` endpoint itself has **no** authentication, and the default
+toolset includes write operations (copy/mkdir/delete). Do not expose it to untrusted
+networks without the reverse-proxy auth above.
+
 ## Configuration
+
+These settings configure the server **process itself**. They work identically no
+matter which of the two ways the process gets started:
+
+- **spawned by your MCP client** — the client launches the server for you using one
+  of the configs from [Installation](#installation) (`npx`/`docker`, stdio mode). You
+  don't run anything by hand; the settings live in the client's own
+  `env`/`environment` block (or in `-e` flags for Docker).
+- **started manually in a terminal** — required for the standalone `http` mode and
+  for direct testing. You type the command yourself and pass the settings as shell
+  environment variables or CLI flags.
+
+Both channels feed settings into the same process. The two sections below document
+those inputs (environment variables and CLI flags) once.
 
 ### Environment Variables
 
@@ -117,6 +263,14 @@ npx rclone-mcp-server http --port 3000
 | `PORT` | HTTP listen port for the `http` command | `3000` |
 
 ### CLI Arguments
+
+The server's own command-line interface, used when you **start it manually**:
+
+- `stdio` is the default command — it is exactly the process a client spawns for you
+  in stdio mode ([Stdio transport](#stdio-transport-local-processes)), so you rarely
+  type it yourself.
+- `http` is the standalone mode that **must** be started manually — the `Step 1` of
+  [Streamable HTTP transport](#streamable-http-transport-standalone-server).
 
 ```
 rclone-mcp-server [command]
@@ -161,6 +315,11 @@ Special values:
 - `all` — every toolset
 
 ### Examples
+
+Manual terminal invocations of the flags above (the manual channel — run the server
+directly, e.g. for testing, instead of having a client spawn it). The same settings,
+when the server is spawned by a client, go under `RCLONE_TOOLSETS` / `RCLONE_READ_ONLY`
+in the client's `env`/`environment` block (or as `-e` flags for Docker):
 
 ```bash
 # Default toolsets (12 tools)
@@ -212,6 +371,10 @@ fields. For the `stdio` examples below we use the published package via `npx`;
 if you built locally, replace `"command": "npx", "args": ["-y", "rclone-mcp-server"]`
 with `"command": "node", "args": ["/path/to/rclone-mcp-server/dist/index.js"]`.
 
+The examples use the Cursor / Claude Desktop `mcpServers` form. For **opencode**,
+keep the server entry as an opencode `local` config and move every `env` key under
+`environment` — see the opencode variant of Scenario 1 below.
+
 ### Scenario 1 — Standard developer config (default tools + job monitoring)
 
 ```json
@@ -238,6 +401,25 @@ For a remote daemon behind a reverse proxy with HTTP Basic Auth:
       "command": "npx",
       "args": ["-y", "rclone-mcp-server"],
       "env": {
+        "RCLONE_URL": "https://rclone.example.com",
+        "RCLONE_USER": "your_user",
+        "RCLONE_PASS": "your_password",
+        "RCLONE_TOOLSETS": "default,jobs"
+      }
+    }
+  }
+}
+```
+
+Same scenario in **opencode** form (`~/.config/opencode/opencode.json`):
+
+```json
+{
+  "mcp": {
+    "rclone-mcp-server": {
+      "type": "local",
+      "command": ["npx", "-y", "rclone-mcp-server"],
+      "environment": {
         "RCLONE_URL": "https://rclone.example.com",
         "RCLONE_USER": "your_user",
         "RCLONE_PASS": "your_password",
@@ -378,4 +560,3 @@ MIT
 ---
 
 This project is a secondary refactor based on [rclone-ui/rclone-mcp](https://github.com/rclone-ui/rclone-mcp).
-
