@@ -30,8 +30,10 @@
         }
     },
     "files": [
-        "dist"
+        "dist",
+        "README.npm.md"
     ],
+    "readme": "README.npm.md",
     "scripts": {
         "build": "tsup",
         "dev": "tsx src/index.ts",
