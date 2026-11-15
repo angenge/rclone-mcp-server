@@ -1,0 +1,69 @@
+services:
+  rclone-rcd-service:
+    image: docker.io/rclone/rclone:1.69.3
+    container_name: rclone-rcd
+    restart: always
+
+    healthcheck:
+      test: ["CMD-SHELL", "rclone rc rc/noop --rc-user=$$RCLONE_RC_USER --rc-pass=$$RCLONE_RC_PASS || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    security_opt:
+      - apparmor:unconfined
+      
+    # 仅绑定到本机 127.0.0.1，安全地通过 Caddy 反代访问
+    ports:
+      - "127.0.0.1:5572:5572" 
+      
+    volumes:
+      # 同步宿主机时区，保证日志时间准确
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      
+      # 配置文件
+      - ./config/rclone.conf:/config/rclone.conf
+      
+      # 持久化 VFS 缓存，防止重启丢失缓存块
+      - ./cache:/root/.cache/rclone
+      
+      # 提前映射好挂载路径（必须带 :shared），方便 API 挂载时透传给宿主机
+      - /DATA/gdrive-acct-a:/mnt/gdrive-acct-a:shared
+      - /DATA/gdrive-acct-b:/mnt/gdrive-acct-b:shared
+
+    # 使用环境变量传递账号密码，密码必须通过 .env 提供（不设默认值，未配置则启动失败）
+    environment:
+      - RCLONE_RC_USER=${RCLONE_USER:-<RC_USER>}
+      - RCLONE_RC_PASS=${RCLONE_PASS:?请在项目根目录 .env 中设置 RCLONE_PASS 后再启动}
+      
+    command:
+      - rcd
+      - --config=/config/rclone.conf
+      - --rc-web-gui
+      - --rc-addr=0.0.0.0:5572
+      # --- 日志相关 ---
+      - --log-level=INFO
+      # 不设置 --log-file：默认输出到 stderr，Docker 日志驱动可直接捕获（/dev/stdout 不支持 seek 会报 illegal seek）
+      # --- 容错与超时 ---
+      - --retries=10
+      - --retries-sleep=60s
+      - --timeout=10m
+      # --- 性能与缓冲 ---
+      - --buffer-size=64M
+      - --use-mmap
+      # --- API 限流与伪装 ---
+      - --tpslimit=10
+      - --tpslimit-burst=10
+      - "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
